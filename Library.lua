@@ -1208,186 +1208,146 @@ do
         return Toggle;
     end;
 
-    function Funcs:AddSlider(Idx, Info)
-        assert(Info.Default and Info.Text and Info.Min and Info.Max and Info.Rounding, 'Bad Slider Data');
-
-        local Slider = {
-            Value = Info.Default;
-            Min = Info.Min;
-            Max = Info.Max;
-            Rounding = Info.Rounding;
-            MaxSize = 232;
-            Type = 'Slider';
-        };
-
-        local Groupbox = self;
-        local Container = Groupbox.Container;
-
-        if not Info.Compact then
-            Library:CreateLabel({
+    local slider = {}
+    slider.__index = slider
+    
+    function slider.new(index, info)
+        assert(info.Default and info.Text and info.Min and info.Max and info.Rounding, 'Bad Slider Data')
+        local self = setmetatable({}, slider)
+        
+        self.index = index
+        self.value = info.Default
+        self.min = info.Min
+        self.max = info.Max
+        self.rounding = info.Rounding
+        self.max_size = 232
+        self.compact = info.Compact or false
+        self.type = 'Slider'
+    
+        return self
+    end
+    
+    function slider:add_to_container(container)
+        if not self.compact then
+            library:create_label({
                 Size = UDim2.new(1, 0, 0, 10);
                 TextSize = 14;
                 Text = Info.Text;
                 TextXAlignment = Enum.TextXAlignment.Left;
                 TextYAlignment = Enum.TextYAlignment.Bottom;
                 ZIndex = 5;
-                Parent = Container;
-            });
-
-            Groupbox:AddBlank(3);
+                Parent = container;
+            })
+    
+            self:add_blank(3)
         end
-
-        local SliderOuter = Library:Create('Frame', {
+    
+        local outer_frame = library:create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
             Size = UDim2.new(1, -4, 0, 13);
             ZIndex = 5;
-            Parent = Container;
-        });
-
-        Library:AddToRegistry(SliderOuter, {
+            Parent = container;
+        })
+    
+        library:add_to_registry(outer_frame, {
             BorderColor3 = 'Black';
-        });
-
-        local SliderInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
-            BorderColor3 = Library.OutlineColor;
+        })
+    
+        self.inner_frame = library:create('Frame', {
+            BackgroundColor3 = library.MainColor;
+            BorderColor3 = library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(1, 0, 1, 0);
             ZIndex = 6;
-            Parent = SliderOuter;
-        });
-
-        Library:AddToRegistry(SliderInner, {
+            Parent = outer_frame;
+        })
+    
+        library:add_to_registry(self.inner_frame, {
             BackgroundColor3 = 'MainColor';
             BorderColor3 = 'OutlineColor';
-        });
-
-        local Fill = Library:Create('Frame', {
-            BackgroundColor3 = Library.AccentColor;
-            BorderColor3 = Library.AccentColorDark;
+        })
+    
+        self.fill = library:create('Frame', {
+            BackgroundColor3 = library.AccentColor;
+            BorderColor3 = library.AccentColorDark;
             Size = UDim2.new(0, 0, 1, 0);
             ZIndex = 7;
-            Parent = SliderInner;
-        });
-
-        Library:AddToRegistry(Fill, {
+            Parent = self.inner_frame;
+        })
+    
+        library:add_to_registry(self.fill, {
             BackgroundColor3 = 'AccentColor';
             BorderColor3 = 'AccentColorDark';
-        });
-
-        local HideBorderRight = Library:Create('Frame', {
-            BackgroundColor3 = Library.AccentColor;
+        })
+    
+        self.hide_border_right = library:create('Frame', {
+            BackgroundColor3 = library.AccentColor;
             BorderSizePixel = 0;
             Position = UDim2.new(1, 0, 0, 0);
             Size = UDim2.new(0, 1, 1, 0);
             ZIndex = 8;
-            Parent = Fill;
-        });
-
-        Library:AddToRegistry(HideBorderRight, {
+            Parent = self.fill;
+        })
+    
+        library:add_to_registry(self.hide_border_right, {
             BackgroundColor3 = 'AccentColor';
-        });
-
-        local DisplayLabel = Library:CreateLabel({
+        })
+    
+        self.display_label = library:create_label({
             Size = UDim2.new(1, 0, 1, 0);
             TextSize = 14;
             Text = 'Infinite';
             ZIndex = 9;
-            Parent = SliderInner;
-        });
-
-        Library:OnHighlight(SliderOuter, SliderOuter,
+            Parent = self.inner_frame;
+        })
+    
+        library:on_highlight(outer_frame, outer_frame,
             { BorderColor3 = 'AccentColor' },
             { BorderColor3 = 'Black' }
-        );
+        )
+    end
+    
+    function slider:update_colors()
+        self.fill.BackgroundColor3 = library.AccentColor
+        self.fill.BorderColor3 = library.AccentColorDark
+    end
+    
+    function slider:display()
+        local suffix = self.suffix or ''
+        self.display_label.Text = string.format('%s/%s', self.value, self.max) .. suffix
+        local percentage = math.clamp((self.value - self.min) / (self.max - self.min), 0, 1)
+        self.fill:TweenSize(UDim2.new(percentage, 0, 1, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Quad, 0.1, true)
+        end
+        
+        function slider:add_blank(amount)
+        for i = 1, amount do
+        library:create('Frame', {
+        BackgroundTransparency = 1;
+        Size = UDim2.new(1, 0, 0, 3);
+        ZIndex = 5;
+        Parent = container;
+        })
+        end
+        end
+        
+        function slider:update_value(input)
+        local old_value = self.value
+        local new_value = tonumber(string.format('%.' .. self.rounding .. 'f', (input.Position.X - self.inner_frame.AbsolutePosition.X) / self.max_size * (self.max - self.min) + self.min))
+        self.value = new_value
+        self:display()
+        if old_value ~= new_value and self.callback then
+        self.callback(new_value)
+        end
+        end
+        
+        function slider:bind_to_callback(callback)
+        self.callback = callback
+        end
+        
+        return slider
 
-        function Slider:UpdateColors()
-            Fill.BackgroundColor3 = Library.AccentColor;
-            Fill.BorderColor3 = Library.AccentColorDark;
-        end;
-
-        function Slider:Display()
-            local Suffix = Info.Suffix or '';
-            DisplayLabel.Text = string.format('%s/%s', Slider.Value .. Suffix, Slider.Max .. Suffix);
-
-            local X = math.ceil(Library:MapValue(Slider.Value, Slider.Min, Slider.Max, 0, Slider.MaxSize));
-            Fill.Size = UDim2.new(0, X, 1, 0);
-
-            HideBorderRight.Visible = not (X == Slider.MaxSize or X == 0);
-        end;
-
-        function Slider:OnChanged(Func)
-            Slider.Changed = Func;
-            Func();
-        end;
-
-        local function Round(Value)
-            if Slider.Rounding == 0 then
-                return math.floor(Value);
-            end;
-
-            local Str = Value .. '';
-            local Dot = Str:find('%.');
-
-            return Dot and tonumber(Str:sub(1, Dot + Slider.Rounding)) or Value;
-        end;
-
-        function Slider:GetValueFromXOffset(X)
-            return Round(Library:MapValue(X, 0, Slider.MaxSize, Slider.Min, Slider.Max));
-        end;
-
-        function Slider:SetValue(Str)
-            local Num = tonumber(Str);
-
-            if (not Num) then
-                return;
-            end;
-
-            Num = math.clamp(Num, Slider.Min, Slider.Max);
-
-            Slider.Value = Num;
-            Slider:Display();
-
-            if Slider.Changed then
-                Slider.Changed();
-            end;
-        end;
-
-        SliderInner.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
-                local mPos = Mouse.X;
-                local gPos = Fill.Size.X.Offset;
-                local Diff = mPos - (Fill.AbsolutePosition.X + gPos);
-
-                while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
-                    local nMPos = Mouse.X;
-                    local nX = math.clamp(gPos + (nMPos - mPos) + Diff, 0, Slider.MaxSize);
-
-                    local nValue = Slider:GetValueFromXOffset(nX);
-                    local OldValue = Slider.Value;
-                    Slider.Value = nValue;
-
-                    Slider:Display();
-
-                    if nValue ~= OldValue and Slider.Changed then
-                        Slider.Changed();
-                    end;
-
-                    RenderStepped:Wait();
-                end;
-
-                Library:AttemptSave();
-            end;
-        end);
-
-        Slider:Display();
-        Groupbox:AddBlank(Info.BlankSize or 6);
-        Groupbox:Resize();
-
-        Options[Idx] = Slider;
-
-        return Slider;
-    end;
+    end
+    
 
     function Funcs:AddDropdown(Idx, Info)
         assert(Info.Text and Info.Values, 'Bad Dropdown Data');
